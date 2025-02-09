@@ -22,6 +22,9 @@ from geodataset.utils.file_name_conventions import (
     PointCloudTileNameConvention, validate_and_convert_product_name,
 )
 
+import subprocess
+import os
+import yaml
 
 class PointCloudTilerizer:
     """
@@ -67,6 +70,7 @@ class PointCloudTilerizer:
         tile_overlap: float = None,
         max_tile: int = 5000,
         force: bool = False,
+        repo_path: str = None,  # Path to the repository for Git info
     ):
         assert not (
             tile_side_length and tiles_metadata
@@ -85,6 +89,7 @@ class PointCloudTilerizer:
         self.downsample_voxel_size = downsample_voxel_size
         self.verbose = verbose
         self.force = force
+        self.repo_path = repo_path
 
         if self.tiles_metadata is None:
             assert (
@@ -233,6 +238,7 @@ class PointCloudTilerizer:
     ):
         self._tilerize()
         self.plot_aois()
+        self.write_config_to_yaml(self.repo_path, self.output_path / "config.yaml")
 
     def plot_aois(self) -> None:
         fig, ax = self.tiles_metadata.plot()
@@ -384,3 +390,62 @@ class PointCloudTilerizer:
         pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
 
         return pcd
+
+    def get_git_version(self, repo_path):
+        """Retrieve the current branch name, commit hash, and repository name of a specified repository."""
+        try:
+            # Ensure the provided path is a git repository
+            if not os.path.exists(os.path.join(repo_path, ".git")):
+                raise ValueError(f"The path '{repo_path}' is not a valid git repository.")
+
+            # Get the repository name from the directory name
+            repo_name = os.path.basename(os.path.normpath(repo_path))
+
+            # Get the current branch name of the specified repository
+            branch = subprocess.check_output(
+                ["git", "-C", repo_path, "rev-parse", "--abbrev-ref", "HEAD"],
+                stderr=subprocess.STDOUT
+            ).strip().decode('utf-8')
+
+            # Get the latest commit hash of the specified repository
+            commit = subprocess.check_output(
+                ["git", "-C", repo_path, "rev-parse", "HEAD"],
+                stderr=subprocess.STDOUT
+            ).strip().decode('utf-8')
+
+            return {"repository": repo_name, "branch": branch, "commit": commit}
+        except subprocess.CalledProcessError:
+            return {"repository": None, "branch": None, "commit": None}
+        except ValueError as e:
+            print(e)
+            return {"repository": None, "branch": None, "commit": None}
+
+    def write_config_to_yaml(self, repo_path, output_path):
+        """Write the configuration and Git details to a YAML file."""
+        # Collect configuration settings
+        config = {
+            "point_cloud_path": str(self.point_cloud_path),
+            "output_path": str(self.output_path),
+            "tile_side_length": self.tile_side_length,
+            "keep_dims": self.keep_dims,
+            "downsample_voxel_size": self.downsample_voxel_size,
+            "verbose": self.verbose,
+            "tile_overlap": self.tile_overlap,
+            "max_tile": self.max_tile,
+            "force": self.force,
+            # Add other relevant parameters as needed
+        }
+
+        # Get Git version info
+        if repo_path is not None:
+            git_info = self.get_git_version(repo_path)
+        else:
+            git_info = {"repository": None, "branch": None, "commit": None}
+        # Combine configuration and Git information
+        config_with_git = {"config": config, "git_info": git_info}
+
+        # Write to YAML file
+        with open(output_path, "w") as file:
+            yaml.dump(config_with_git, file)
+
+        print(f"Configuration and Git info written to {output_path}")

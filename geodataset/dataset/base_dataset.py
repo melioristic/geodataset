@@ -264,7 +264,7 @@ class BaseLabeledPointCloudCocoDataset(BaseDataset, ABC):
         """
         for directory in directories:
             for path in directory.iterdir():
-                if path.is_file() and path.name.endswith(f".json") and "pc_coco" in path.name:
+                if path.is_file() and path.name.endswith(f".json") and "pccoco" in path.name:
                     product_name, scale_factor, ground_resolution, voxel_size, fold = PointCloudCocoNameConvention.parse_name(
                         path.name)
                     if fold == self.fold:
@@ -340,15 +340,16 @@ class BaseLabeledPointCloudCocoDataset(BaseDataset, ABC):
 
         for directory in directories:
             if directory.is_dir() and directory.name.startswith("pc_tiles"):
-                for tile_path in directory.iterdir():
-                    if tile_path.name in self.tiles_path_to_id_mapping:
-                        tile_id = self.tiles_path_to_id_mapping[tile_path.name]
-                        if 'path' in self.tiles[tile_id] and self.tiles[tile_id]['path'] != tile_path:
-                            raise Exception(
-                                f"At least two tiles under the root directories {self.root_path} have the same"
-                                f" name, which is ambiguous. Make sure all tiles have unique names. The 2"
-                                f" ambiguous tiles are {tile_path} and {self.tiles[tile_id]['path']}.")
-                        self.tiles[tile_id]['path'] = tile_path
+                for split in ["train", "valid", "test"]:
+                    for tile_path in (directory / split).iterdir():
+                        if tile_path.name in self.tiles_path_to_id_mapping:
+                            tile_id = self.tiles_path_to_id_mapping[tile_path.name]
+                            if 'path' in self.tiles[tile_id] and self.tiles[tile_id]['path'] != tile_path:
+                                raise Exception(
+                                    f"At least two tiles under the root directories {self.root_path} have the same"
+                                    f" name, which is ambiguous. Make sure all tiles have unique names. The 2"
+                                    f" ambiguous tiles are {tile_path} and {self.tiles[tile_id]['path']}.")
+                            self.tiles[tile_id]['path'] = tile_path
 
             if directory.is_dir():
                 for path in directory.iterdir():

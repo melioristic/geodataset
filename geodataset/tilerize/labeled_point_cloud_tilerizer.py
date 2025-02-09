@@ -89,6 +89,7 @@ class LabeledPointCloudTilerizer(PointCloudTilerizer):
         verbose: bool = False,
         force: bool = False,
         tile_side_length: float = None,
+        repo_path: str = None,
     ) -> None:
         self.point_cloud_path = Path(point_cloud_path)
         self.product_name = validate_and_convert_product_name(strip_all_extensions_and_path(self.point_cloud_path))
@@ -109,6 +110,8 @@ class LabeledPointCloudTilerizer(PointCloudTilerizer):
         self.verbose = verbose
         self.max_tile = max_tile
         self.force = force
+        self.repo_path = repo_path
+        
 
         self.tile_side_length = tile_side_length
 
@@ -352,6 +355,7 @@ class LabeledPointCloudTilerizer(PointCloudTilerizer):
         self._generate_labels()
         self._tilerize()
         super().plot_aois()
+        super().write_config_to_yaml(self.repo_path, self.output_path / "config.yaml")
 
     def _tilerize(self):
         new_tile_md_list = []
@@ -371,7 +375,8 @@ class LabeledPointCloudTilerizer(PointCloudTilerizer):
                 tile_labels = self._get_tile_labels(
                     tile_md.tile_id, self.aoi_tiles.copy(), self.aoi_labels.copy()
                 )
-                tile_labels = tile_labels.to_crs(reader_crs)
+                
+                tile_labels = tile_labels.to_crs(reader_crs) #FIXME: ignore_tiles_without_labels is not working empty gdf to_crs fails
                 pcd = self._add_labels(pcd, tile_labels, reader_crs)
                 new_tile_md_list.append(tile_md)
 
